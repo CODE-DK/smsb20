@@ -1,34 +1,49 @@
 package root.service;
 
+import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.jpa.repository.Lock;
-import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 import root.entity.DeviceStatus;
 import root.repo.DeviceStatusRepo;
+import root.threads.IpChecker;
 
-import javax.persistence.LockModeType;
-import javax.transaction.Transactional;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
-@Service
+@Component
 public class CheckConnectionService {
+
+    @Value("${check_connection_timeout}")
+    private int timeout;
+
+    @Setter
+    private boolean stop;
 
     @Autowired
     private DeviceStatusRepo repo;
 
-    public List<DeviceStatus> checkDevice(List<String> ips) {
-        ExecutorService pool = Executors.newFixedThreadPool(10);
+    private List<DeviceStatus> checkDevice(List<String> ips) throws ExecutionException, InterruptedException {
+        ExecutorService pool = Executors.newFixedThreadPool(100);
+        List<Future<DeviceStatus>> futures = new ArrayList<>();
+        List<DeviceStatus> devices = new ArrayList<>();
         for (String ip : ips) {
-            // TODO: 27.08.2019 добавить обработку в потоке
+            futures.add(pool.submit(new IpChecker(ip)));
         }
-        return repo.findAll();
+        for (Future<DeviceStatus> future : futures) {
+            devices.add(future.get());
+        }
+        return repo.saveAll(devices);
     }
 
-    @Transactional
-    @Lock(LockModeType.OPTIMISTIC_FORCE_INCREMENT)
-    public void save(DeviceStatus status){
-        repo.save(status);
+    public void updateStatus(List<String> ips) throws ExecutionException, InterruptedException {
+        while (!stop) {
+            checkDevice(ips);
+            Thread.sleep(timeout);
+        }
     }
 }
