@@ -1,7 +1,6 @@
 package root.service;
 
 import lombok.Setter;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import root.entity.DeviceStatus;
@@ -51,9 +50,9 @@ public class CheckConnectionService {
     }
 
     public void updateStatus(List<String> ips) throws ExecutionException, InterruptedException {
-        while (!stop) {
+        do {
             checkDevice(ips);
             Thread.sleep(timeout);
-        }
+        } while (!stop);
     }
 }
