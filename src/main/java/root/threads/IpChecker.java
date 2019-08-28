@@ -19,8 +19,8 @@ public class IpChecker implements Callable<DeviceStatus> {
 
     @Override
     public DeviceStatus call() throws Exception {
-        InetAddress address = getIp(this.ip);
-        return new DeviceStatus(this.ip, address.isReachable(1000), LocalDateTime.now());
+        InetAddress ip = getIp(this.ip);
+        return new DeviceStatus(this.ip, ip.isReachable(1000), LocalDateTime.now());
     }
 
     private InetAddress getIp(String ip) throws UnknownHostException {

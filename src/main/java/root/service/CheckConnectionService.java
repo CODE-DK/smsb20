@@ -17,27 +17,37 @@ import java.util.concurrent.Future;
 
 @Component
 public class CheckConnectionService {
-
+    private static final int maxPoolSize = 100;
     @Value("${check_connection_timeout}")
     private int timeout;
-
     @Setter
     private boolean stop;
+    private final DeviceStatusRepo repo;
 
-    @Autowired
-    private DeviceStatusRepo repo;
+    public CheckConnectionService(DeviceStatusRepo repo) {
+        this.repo = repo;
+    }
 
-    private List<DeviceStatus> checkDevice(List<String> ips) throws ExecutionException, InterruptedException {
-        ExecutorService pool = Executors.newFixedThreadPool(100);
-        List<Future<DeviceStatus>> futures = new ArrayList<>();
+    private void checkDevice(List<String> ips) throws ExecutionException, InterruptedException {
+        ExecutorService pool = Executors.newFixedThreadPool(maxPoolSize);
+        List<DeviceStatus> devices = getDeviceStatuses(getFutures(ips, pool));
+        repo.saveAll(devices);
+    }
+
+    private List<DeviceStatus> getDeviceStatuses(List<Future<DeviceStatus>> futures) throws InterruptedException, ExecutionException {
         List<DeviceStatus> devices = new ArrayList<>();
-        for (String ip : ips) {
-            futures.add(pool.submit(new IpChecker(ip)));
-        }
         for (Future<DeviceStatus> future : futures) {
             devices.add(future.get());
         }
-        return repo.saveAll(devices);
+        return devices;
+    }
+
+    private List<Future<DeviceStatus>> getFutures(List<String> ips, ExecutorService pool) {
+        List<Future<DeviceStatus>> futures = new ArrayList<>();
+        for (String ip : ips) {
+            futures.add(pool.submit(new IpChecker(ip)));
+        }
+        return futures;
     }
 
     public void updateStatus(List<String> ips) throws ExecutionException, InterruptedException {
